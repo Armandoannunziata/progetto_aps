@@ -10,3 +10,6 @@ __pycache__/
 
 # Configurazione IDE (PyCharm / IntelliJ)
 .idea/
+
+# Cartella pulita generata per la consegna (artefatto derivato dai sorgenti)
+elezioni_unisa_consegna/
