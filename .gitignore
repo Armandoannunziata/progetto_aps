@@ -1,0 +1,12 @@
+# Ambienti virtuali e cache di Python (rigenerati localmente, non vanno consegnati)
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Archivi di backup
+*.tgz
+
+# Configurazione IDE (PyCharm / IntelliJ)
+.idea/
