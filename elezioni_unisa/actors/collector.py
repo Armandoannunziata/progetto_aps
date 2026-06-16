@@ -92,9 +92,6 @@ class VoteCollector:
         self._closed = True
         logger.info(f"[{self.identity}] Urne chiuse. Radice firmata. Foglie: {len(self.records)}.")
 
-    def get_root(self) -> str:
-        return self.tree.get_root()
-
     def get_receipt(self, seq: int) -> dict:
         """Ricevuta dell'elettore (dopo la chiusura): Merkle proof contro la radice definitiva."""
         if not self._closed:

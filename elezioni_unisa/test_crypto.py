@@ -6,6 +6,7 @@ logging.disable(logging.INFO)
 from crypto.pki import PKI
 from crypto.shamir import ShamirSecretSharing
 from crypto.merkle import MerkleTree
+from actors.ca import UnisaCA
 
 
 def test_signatures_and_encryption():
@@ -61,9 +62,32 @@ def test_merkle_freeze_and_proof():
     print("Merkle build/proof (radice finale): OK")
 
 
+def test_ca_revocation():
+    """Esercita il ciclo di revoca dell'attore UnisaCA (emissione -> revoca ->
+    ricostruzione CRL -> rifiuto). Verifica la coerenza con WP3: un certificato
+    valido viene accettato finche' la CRL disponibile non lo elenca, e dopo la
+    revoca il controllo hard-fail (verify_certificate) lo rigetta."""
+    ca = UnisaCA()
+    priv, pub = PKI.generate_rsa_keypair(2048)
+    cert = ca.issue_certificate("ElettoreRevocando", pub)
+    # prima della revoca: catena valida, CRL disponibile e non lo elenca -> accettato
+    assert ca.verify_certificate(cert) is True
+    assert not PKI.is_revoked(cert, ca.get_crl())
+    # revoca: il serial entra nella CRL, che viene ricostruita e ri-firmata dalla CA
+    ca.revoke(cert)
+    assert PKI.is_revoked(cert, ca.get_crl())
+    # dopo la revoca: verify_certificate rigetta con PermissionError (revocato)
+    try:
+        ca.verify_certificate(cert); assert False
+    except PermissionError:
+        pass
+    print("UnisaCA emissione/revoca/CRL: OK")
+
+
 if __name__ == "__main__":
     test_signatures_and_encryption()
     test_x509_chain_and_crl()
     test_shamir()
     test_merkle_freeze_and_proof()
+    test_ca_revocation()
     print("\nTutti i test superati.")

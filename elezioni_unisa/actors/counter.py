@@ -41,7 +41,14 @@ class VoteCounter:
         priv, self.public_key = PKI.generate_rsa_keypair()
         self.cert = ca.issue_certificate(self.identity, self.public_key)
 
-        # Incapsulamento: PEM della privata cifrata con chiave Fernet; quote Shamir della chiave Fernet.
+        # Incapsulamento (key-wrapping) della chiave di scrutinio: la privata RSA viene
+        # serializzata in PEM e cifrata con una chiave simmetrica Fernet; e' SOLO questa
+        # chiave Fernet a essere frammentata con Shamir. Non si applica Shamir alla chiave
+        # RSA direttamente perche' il segreto Shamir e' un intero < PRIME (cfr.
+        # crypto/shamir.py): un modulo RSA da 2048 bit eccede il campo e, soprattutto, non
+        # sarebbe ricostruibile come oggetto-chiave dal solo intero. La chiave Fernet
+        # (~352 bit) sta comodamente sotto PRIME, quindi si condivide quella e la si usa
+        # per riaprire la privata solo a urne chiuse, con almeno 'threshold' quote (S.3).
         priv_pem = priv.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
@@ -53,7 +60,17 @@ class VoteCounter:
         self.shares = ShamirSecretSharing.split_secret(
             int.from_bytes(fernet_key, "big"), threshold, shares_count
         )
-        # distruzione del materiale in chiaro
+        # Rilascio dei riferimenti al materiale in chiaro: dopo l'incapsulamento la
+        # chiave privata di scrutinio, la chiave Fernet e il PEM in chiaro non devono
+        # piu' essere raggiungibili dall'oggetto VoteCounter, che da qui in avanti
+        # custodisce solo il blob cifrato (self._wrapped_priv) e le quote Shamir. Si
+        # noti il limite: in CPython 'del' rimuove il legame del nome e rende l'oggetto
+        # candidato alla garbage collection, ma NON e' un azzeramento sicuro della
+        # memoria (gli oggetti bytes/int sono immutabili e il loro contenuto puo'
+        # restare nelle pagine fino al riuso). Un'erasure garantita richiederebbe
+        # buffer mutabili e supporto del runtime/HSM, fuori dal perimetro del corso e
+        # rinviata al lavoro futuro (§1.5). Qui l'invariante che conta e' che la chiave
+        # di scrutinio non sia ricostruibile sotto la soglia di quote Shamir.
         del priv, fernet_key, priv_pem
         logger.info(f"[{self.identity}] Chiave di scrutinio incapsulata; {shares_count} quote distribuite.")
 

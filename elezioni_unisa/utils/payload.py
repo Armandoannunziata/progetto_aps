@@ -53,14 +53,6 @@ class EncryptedBallot:
     ciphertext: bytes          # C = RSA-OAEP(PK_VoteCounter, VotePayload)
     ephemeral_signature: bytes  # Auth = Sign(SK_eff, C)
 
-    def get_leaf_data(self) -> bytes:
-        """[D3=A / D8] Dato-foglia del Merkle tree: H(C) || H(token_id).
-        La foglia memorizzata nell'albero è poi SHA-256 di questo valore
-        (cfr. crypto/merkle.py), ossia leaf = H( H(C) || H(token_id) )."""
-        h_c = hashlib.sha256(self.ciphertext).digest()
-        h_t = hashlib.sha256(self.token_id.encode()).digest()
-        return h_c + h_t
-
 
 @dataclass
 class PublicRecord:
@@ -84,4 +76,12 @@ class PublicRecord:
         return AuthToken(self.token_id, self.ephemeral_pub_key_pem, self.registrar_signature)
 
     def leaf_data(self) -> bytes:
-        return self.to_ballot().get_leaf_data()
+        """[D3=A / D8 / §2.2.8] Dato-foglia del Merkle tree: H(C) || H(token_id).
+        La foglia memorizzata nell'albero è poi SHA-256 di questo valore
+        (cfr. crypto/merkle.py), ossia leaf = H( H(C) || H(token_id) ). Il
+        valore si calcola direttamente dai due campi pubblici del record (il
+        ciphertext della scheda e l'identificativo del token), senza ricostruire
+        una scheda intermedia: il record pubblicato è già l'unità verificabile."""
+        h_c = hashlib.sha256(self.ciphertext).digest()
+        h_t = hashlib.sha256(self.token_id.encode()).digest()
+        return h_c + h_t

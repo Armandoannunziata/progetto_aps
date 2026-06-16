@@ -16,6 +16,10 @@ Nota metodologica: nel blocco 3 si riutilizza un piccolo pool di chiavi effimere
 per sintetizzare le N schede; il costo della generazione di chiave e' gia' misurato
 a parte (blocco 1). Il riuso non altera i tempi delle operazioni che scalano con N
 (cifratura, decifratura, hashing, verifica di firma), ma rende eseguibile N=10000.
+La verifica universale a scala viene misurata su una bacheca pubblica REALE
+(bulletin_board.PublicBulletin), non su una struttura sintetica parallela: il
+verificatore percorre esattamente gli stessi controlli di catena/firma/CRL del
+flusso di produzione, e non esiste un secondo modello-dati da tenere allineato.
 """
 import time
 import json
@@ -127,14 +131,14 @@ def scale_sweep():
                 pass
         tally_ms = (time.perf_counter() - t) * 1000.0
 
-        # bundle minimale per la verifica universale (riusa le stesse strutture pubbliche)
+        # bacheca pubblica REALE per la verifica universale (riusa PublicBulletin)
         scrutiny = []
         agg = {"SI": 0, "NO": 0, "BIANCA": 0}
         for r in records:
             v = ["SI", "NO", "BIANCA"][r.seq % 3]
             agg[v] += 1
             scrutiny.append((r.seq, r.ciphertext, v))
-        b = _BundleStub(records, root, scrutiny, agg, reg_priv, reg_pub, counter_priv)
+        b = _public_bulletin(records, root, scrutiny, agg, reg_pub, counter_priv)
         t = time.perf_counter()
         verifier.verify_election(b)
         verify_ms = (time.perf_counter() - t) * 1000.0
@@ -142,35 +146,39 @@ def scale_sweep():
         print(f"  {n:>7d} | {build_ms:>12.2f} | {tally_ms:>12.2f} | {verify_ms:>15.2f}")
 
 
-class _BundleStub:
-    """Bundle pubblico sintetico per misurare la verifica universale senza l'intera orchestrazione.
-    Costruisce certificati reali firmati da una CA effimera, cosi' che il verificatore esegua
-    esattamente le stesse verifiche di firma/catena del flusso reale."""
-    def __init__(self, records, root, scrutiny, aggregates, reg_priv, reg_pub, counter_priv):
-        ca = UnisaCA()
-        self.records = records
-        self.root = root
-        self.signed_root = None  # firmata sotto, dopo aver emesso il cert del collector
-        self.aggregates = aggregates
-        self.valid_total = sum(aggregates.values())
-        self.discarded_corrupt = 0
-        self.discarded_domain = len(records) - self.valid_total
-        self.scrutiny = scrutiny
-        self.election_id = EID
-        self.electorate_size = len(records)
-        # certificati reali
-        reg_cert = ca.issue_certificate("AuthUnisa", reg_pub)
-        col_priv, col_pub = PKI.generate_rsa_keypair()
-        col_cert = ca.issue_certificate("VoteCollector", col_pub)
-        cnt_cert = ca.issue_certificate("VoteCounter", counter_priv.public_key())
-        self.signed_root = PKI.sign(col_priv, root.encode())
-        self.root_cert_pem = PKI.cert_to_pem(ca.get_root_cert())
-        from cryptography.hazmat.primitives.serialization import Encoding
-        self.crl_pem = ca.get_crl().public_bytes(Encoding.PEM)
-        self.registrar_cert_pem = PKI.cert_to_pem(reg_cert)
-        self.collector_cert_pem = PKI.cert_to_pem(col_cert)
-        self.counter_cert_pem = PKI.cert_to_pem(cnt_cert)
-        # nota: in questo stub la firma del registrar sui token usa reg_priv -> reg_cert (coerente)
+def _public_bulletin(records, root, scrutiny, aggregates, reg_pub, counter_priv):
+    """Costruisce una bacheca pubblica REALE (bulletin_board.PublicBulletin) per misurare
+    la verifica universale a scala, anziche' re-dichiarare a mano i campi del bundle. Si
+    riusa cosi' l'unica struttura pubblica del sistema, eliminando il percorso-dati
+    parallelo (la vecchia classe-ombra _BundleStub) che andava mantenuto in sincronia con
+    PublicBulletin. I certificati di registrar/collector/counter sono firmati da una CA
+    effimera (UnisaCA, ora a 2048 bit come gli altri attori), cosi' che il verificatore
+    esegua ESATTAMENTE le stesse verifiche di catena/firma/CRL del flusso reale; la firma
+    del registrar sui token usa la coppia reg_pub coerente con reg_cert."""
+    from cryptography.hazmat.primitives.serialization import Encoding
+    ca = UnisaCA()
+    reg_cert = ca.issue_certificate("AuthUnisa", reg_pub)
+    col_priv, col_pub = PKI.generate_rsa_keypair()
+    col_cert = ca.issue_certificate("VoteCollector", col_pub)
+    cnt_cert = ca.issue_certificate("VoteCounter", counter_priv.public_key())
+    valid_total = sum(aggregates.values())
+    return PublicBulletin(
+        election_id=EID,
+        electorate_size=len(records),
+        records=records,
+        root=root,
+        signed_root=PKI.sign(col_priv, root.encode()),
+        aggregates=aggregates,
+        valid_total=valid_total,
+        discarded_corrupt=0,
+        discarded_domain=len(records) - valid_total,
+        scrutiny=scrutiny,
+        root_cert_pem=PKI.cert_to_pem(ca.get_root_cert()),
+        crl_pem=ca.get_crl().public_bytes(Encoding.PEM),
+        registrar_cert_pem=PKI.cert_to_pem(reg_cert),
+        collector_cert_pem=PKI.cert_to_pem(col_cert),
+        counter_cert_pem=PKI.cert_to_pem(cnt_cert),
+    )
 
 
 if __name__ == "__main__":

@@ -113,6 +113,21 @@ def run():
     print(f"   Aggregati: {result['aggregates']}  | validi: {result['valid_total']}  | "
           f"scarti: corrotte={result['discarded_corrupt']} fuori-dominio={result['discarded_domain']}")
 
+    # Riconciliazione lato GESTORI (non e' una verifica pubblica): confronto tra i
+    # token leciti emessi da AuthUnisa e i record effettivamente presenti in urna.
+    # E' un controllo interno di coerenza amministrativa basato sullo stato privato
+    # di AuthUnisa, DISTINTO dalle verifiche universali di verifier.py (che si
+    # fondano sui soli dati pubblici della bacheca e non possono leggere quanti
+    # token l'autorita' ha rilasciato). In generale vale emessi >= in_urna: un
+    # avente diritto puo' ottenere il token ma non completare una sottomissione
+    # valida; qui [A3] ha ricevuto un token regolare ma la sua scheda con C
+    # manomesso e' stata respinta da VoteCollector, quindi una differenza non e'
+    # un'anomalia ma misura quante autorizzazioni non si sono tradotte in voto.
+    issued = registrar.issued_token_count()
+    in_urn = len(board["records"])
+    print(f"   Riconciliazione (lato gestori): token emessi={issued}, record in urna={in_urn}, "
+          f"autorizzazioni non confluite in voto={issued - in_urn}")
+
     sep("FASE 5 - VERIFICA UNIVERSALE (chiunque, da dati pubblici)")
     bulletin = PublicBulletin.assemble(ELECTION_ID, ELECTORATE_SIZE, board, result, ca, registrar.cert)
     res = verifier.verify_election(bulletin)

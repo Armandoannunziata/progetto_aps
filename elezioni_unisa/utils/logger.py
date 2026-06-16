@@ -15,7 +15,3 @@ def setup_logging(level: int = logging.INFO, fmt: str = "%(message)s") -> None:
         root.setLevel(level)
         return
     logging.basicConfig(level=level, format=fmt)
-
-
-def get_logger(name: str) -> logging.Logger:
-    return logging.getLogger(name)

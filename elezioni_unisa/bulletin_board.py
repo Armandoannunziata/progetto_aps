@@ -35,7 +35,7 @@ class PublicBulletin:
 
     @staticmethod
     def assemble(election_id, electorate_size, board, scrutiny_result, ca, registrar_cert) -> "PublicBulletin":
-        from cryptography.x509 import load_pem_x509_crl  # noqa: F401 (documenta la dipendenza)
+        from cryptography.hazmat.primitives.serialization import Encoding
         return PublicBulletin(
             election_id=election_id,
             electorate_size=electorate_size,
@@ -48,13 +48,8 @@ class PublicBulletin:
             discarded_domain=scrutiny_result["discarded_domain"],
             scrutiny=scrutiny_result["scrutiny"],
             root_cert_pem=PKI.cert_to_pem(ca.get_root_cert()),
-            crl_pem=ca.get_crl().public_bytes(_pem()),
+            crl_pem=ca.get_crl().public_bytes(Encoding.PEM),
             registrar_cert_pem=PKI.cert_to_pem(registrar_cert),
             collector_cert_pem=board["collector_cert_pem"],
             counter_cert_pem=scrutiny_result["counter_cert_pem"],
         )
-
-
-def _pem():
-    from cryptography.hazmat.primitives.serialization import Encoding
-    return Encoding.PEM

@@ -17,7 +17,17 @@ logger = logging.getLogger(__name__)
 class UnisaCA:
     def __init__(self, common_name: str = "UnisaCA"):
         logger.info(f"Inizializzazione {common_name} (CA radice)...")
-        self.private_key, self.public_key = PKI.generate_rsa_keypair(4096)
+        # Modulo RSA a 2048 bit, uniforme al parametro del corso e a quello usato da
+        # tutti gli altri attori del sistema (perimetro_corso.md fissa 2048). In una
+        # precedente versione la sola CA usava 4096 bit, come irrigidimento della
+        # radice di fiducia; la deviazione e' stata rimossa per coerenza con il
+        # materiale del corso e con l'uniformita' del progetto. Nota per sviluppi
+        # futuri: una root CA reale a vita lunga adotterebbe comunque un modulo
+        # >= 4096 bit (o una chiave su curva ellittica), poiche' deve resistere per
+        # l'intero periodo di validita' della gerarchia che firma; qui, in una
+        # simulazione effimera, 2048 bit sono adeguati e mantengono il confronto dei
+        # benchmark omogeneo tra tutti gli attori.
+        self.private_key, self.public_key = PKI.generate_rsa_keypair(2048)
         self.cert = PKI.create_self_signed_ca(common_name, self.private_key)
 
         self._revoked_serials = set()             # numeri di serie revocati

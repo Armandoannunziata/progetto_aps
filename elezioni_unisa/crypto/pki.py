@@ -111,6 +111,16 @@ class PKI:
         if not (cert.not_valid_before_utc <= now <= cert.not_valid_after_utc):
             raise ValueError("Certificato fuori dalla finestra di validita'.")
         try:
+            # Padding PKCS#1 v1.5 (NON PSS): qui si verifica la firma con cui la CA ha
+            # firmato il CERTIFICATO X.509, e quel padding e' fissato dal formato del
+            # certificato stesso (campo signatureAlgorithm), non scelto da noi. La
+            # libreria 'cryptography' emette i certificati con RSA + PKCS#1 v1.5, quindi
+            # la verifica deve usare lo stesso schema, altrimenti la firma non torna.
+            # Questo NON e' in contrasto con la preferenza del corso per PSS: PSS regola
+            # le firme APPLICATIVE (token, schede, radice dell'urna, risposta al
+            # challenge) in PKI.sign/PKI.verify; la firma del certificato e' un livello
+            # diverso, governato dallo standard X.509. La sicurezza non ne risente: in
+            # entrambi i casi l'inforgiabilita' poggia su RSA a 2048 bit + SHA-256.
             root_cert.public_key().verify(
                 cert.signature, cert.tbs_certificate_bytes,
                 padding.PKCS1v15(), cert.signature_hash_algorithm,
