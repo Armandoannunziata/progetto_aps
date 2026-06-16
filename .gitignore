@@ -13,3 +13,15 @@ __pycache__/
 
 # Cartella pulita generata per la consegna (artefatto derivato dai sorgenti)
 elezioni_unisa_consegna/
+
+# Materiale del corso e di lavoro: tenuto solo in locale, FUORI dalla repo condivisa
+# (copyright dei docenti / progetti di altri studenti / note interne).
+# Pattern ancorati alla radice ('/') per non ignorare i CLAUDE.md dentro le sottocartelle.
+/Esercitazioni corso/
+/Libri di testo/
+/Progetti_altre_persone/
+/SlideCorso/
+/.claude/
+/CLAUDE.md
+/perimetro_corso.md
+/inventario_file_codice.txt
